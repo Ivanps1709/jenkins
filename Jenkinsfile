@@ -2,33 +2,32 @@ pipeline {
     agent any
 
     stages {
-        stage('Copia de Seguridad/Limpieza') {
+        stage('Checkout') {
             steps {
-                echo 'Limpiando contenedores antiguos...'
-                // Detiene el contenedor anterior si existe para evitar conflictos de puerto
-                sh 'docker stop mi-app-python-container || true'
-                sh 'docker rm mi-app-python-container || true'
+                checkout scm
             }
         }
 
-        stage('Build (Construir Imagen)') {
+        stage('Análisis de Calidad (SonarQube)') {
             steps {
-                echo 'Construyendo la imagen de Docker...'
-                sh 'docker build -t mi-app-python:latest .'
+                script {
+                    // Selecciona la herramienta que configuramos en Jenkins
+                    def scannerHome = tool 'sonar-scanner'
+                    
+                    // Ejecuta el análisis enviándolo al servidor configurado
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=mi-app-python"
+                    }
+                }
             }
         }
 
-        stage('Test (Opcional)') {
+        stage('Build & Deploy') {
             steps {
-                echo 'Verificando que la imagen existe...'
-                sh 'docker images | grep mi-app-python'
-            }
-        }
-
-        stage('Deploy (Ejecutar)') {
-            steps {
-                echo 'Lanzando el contenedor...'
-                sh 'docker run -d -p 5000:5000 --name mi-app-python-container mi-app-python:latest'
+                // Aquí mantienes tus comandos de la Fase 2
+                sh 'docker build -t mi-app-python .'
+                sh 'docker stop contenedor-python || true && docker rm contenedor-python || true'
+                sh 'docker run -d -p 5000:5000 --name contenedor-python mi-app-python'
             }
         }
     }
